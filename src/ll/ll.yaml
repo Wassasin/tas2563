@@ -90,6 +90,7 @@ registers:
     rw_type: rw
     address: 0x04
     size_bits: 8
+    reset_value: 0xc6
     fields:
       amp_ss:
         description: Low EMI spread spectrum enable
@@ -165,6 +166,7 @@ registers:
     rw_type: rw
     address: 0x06
     size_bits: 8
+    reset_value: 0x09
     fields:
       frame_start:
         description: TDM frame start polarity on FSYNC
@@ -208,6 +210,7 @@ registers:
     rw_type: rw
     address: 0x07
     size_bits: 8
+    reset_value: 0x02
     fields:
       rx_edge:
         description: TDM RX capture clock polarity (SBCLK)
@@ -235,6 +238,7 @@ registers:
     rw_type: rw
     address: 0x08
     size_bits: 8
+    reset_value: 0x4a
     fields:
       rx_slen:
         description: TDM RX time slot length
@@ -296,6 +300,7 @@ registers:
     rw_type: rw
     address: 0x0A
     size_bits: 8
+    reset_value: 0x13
     fields:
       tx_edge:
         description: TDM TX launch clock polarity (SBCLK)
@@ -343,6 +348,7 @@ registers:
     rw_type: rw
     address: 0x0B
     size_bits: 8
+    reset_value: 0x04
     fields:
       vsns_slot:
         description: TDM TX voltage sense time slot
@@ -397,7 +403,7 @@ registers:
     address: 0x0E
     size_bits: 8
     fields:
-      temp_slots:
+      temp_slot:
         description: TDM TX temp sensor time slot
         type: u8
         start: 0
@@ -412,7 +418,7 @@ registers:
     address: 0x0F
     size_bits: 8
     fields:
-      gain_slots:
+      gain_slot:
         description: TDM TX limiter gain reduction time slot
         type: u8
         start: 0
@@ -427,7 +433,7 @@ registers:
     address: 0x10
     size_bits: 8
     fields:
-      bst_slots:
+      bst_slot:
         description: TDM TX boost sync and current limit time slot
         type: u8
         start: 0
@@ -554,6 +560,16 @@ registers:
           step320ms:
           step640ms:
           step1280ms:
+      limb_rls_st:
+        description: VBAT Limiter/BOP/ICLA release step size
+        type: u8
+        start: 6
+        end: 8
+        strict_conversion:
+          step0dB25: default
+          step0dB5:
+          step1dB:
+          step2dB:
   dsp_frequency_bop_cfg0:
     description: Sets BOP infinite hold clear, infinite hold enable, mute on brown out and enable
     rw_type: rw
@@ -610,10 +626,10 @@ registers:
         start: 3
         end: 5
         strict_conversion:
-          step0dB25: default
-          step0dB5:
-          step1dB:
-          step2dB:
+          step0dB5: default
+          step1dB0:
+          step1dB5:
+          step2dB0:
       bop_atk_rt:
         description: Brown out prevention attack rate
         type: u8
@@ -653,6 +669,7 @@ registers:
     rw_type: rw
     address: 0x1A
     size_bits: 8
+    reset_value: 0xFC
     fields:
       value:
         type: u8
@@ -687,6 +704,7 @@ registers:
     rw_type: rw
     address: 0x1B
     size_bits: 8
+    reset_value: 0xA6
     fields:
       value:
         type: u8
@@ -715,6 +733,7 @@ registers:
     rw_type: rw
     address: 0x1C
     size_bits: 8
+    reset_value: 0xDF
     fields:
       value:
         type: u8
@@ -749,6 +768,7 @@ registers:
     rw_type: rw
     address: 0x1D
     size_bits: 8
+    reset_value: 0xFF
     fields:
       value:
         type: u8
@@ -907,6 +927,7 @@ registers:
     rw_type: rw
     address: 0x30
     size_bits: 8
+    reset_value: 0x19
     fields:
       irqz_pin_cfg:
         description: IRQZ interrupt configuration
@@ -932,6 +953,7 @@ registers:
     rw_type: rw
     address: 0x31
     size_bits: 8
+    reset_value: 0x40
     fields:
       value:
         type: u8
@@ -963,7 +985,21 @@ registers:
     rw_type: rw
     address: 0x32
     size_bits: 8
+    reset_value: 0x80
     fields:
+      irqz_val:
+        description: IRQZ bit bang in read value. Default is 1b'1 if there are no interupts/errors
+        type: bool
+        start: 0
+      auto_incmm:
+        description: auto-inc of memory across pages option
+        type: bool
+        start: 1
+      irqz_mode:
+        description: IRQZ_PU over-ride options
+        type: u8
+        start: 4
+        end: 7
       irqz_pol:
         description: IRQZ pin polarity for interrupt
         type: u8
@@ -977,6 +1013,7 @@ registers:
     rw_type: rw
     address: 0x33
     size_bits: 8
+    reset_value: 0x34
     fields:
       bst_dynamic_ilim_en:
         description: Dynamic Current Limiter based on VBAT
@@ -1059,6 +1096,7 @@ registers:
     rw_type: rw
     address: 0x35
     size_bits: 8
+    reset_value: 0x74
     fields:
       bst_lr:
         description: Slope of boost load regulation
@@ -1091,12 +1129,58 @@ registers:
           step612us:
           step792us:
           step990us:
-  misc:
-    description: Miscellaneous
+  clock_configuration:
+    description: Clock configuration
+    rw_type: rw
+    address: 0x38
+    size_bits: 8
+    reset_value: 0x0d
+    fields:
+      auto_clk:
+        description: Clocking automatic configuration
+        type: bool
+        start: 0
+      sbclk_fs_ratio:
+        description: Program manually SBCLK to FS ratio when auto clock detection is disabled
+        type: u8
+        start: 2
+        end: 6
+      sel_madc_div_rev:
+        description: MADC Clock divider selection
+        type: u8
+        start: 6
+        end: 7
+      inv_dac_out_phase:
+        description: Inverts DAC OUTPUT phase
+        type: bool
+        start: 7
+  ramp_frame_select:
+    description: Ramp Frame Select
     rw_type: rw
     address: 0x3B
     size_bits: 8
+    reset_value: 0x58
     fields:
+      force_ramp_sel_freq_var:
+        description: Force ramp frequency when in fixed frequency mode
+        type: u8
+        start: 0
+        end: 2
+      force_ramp_sel_freq:
+        description: Ramp frequency select
+        type: u8
+        start: 2
+        end: 3
+      sar_vbat_avg_config:
+        description: Number of VBAT conversions for averaging
+        type: u8
+        start: 3
+        end: 5
+      vbat_dsp_lpf_reg:
+        description: VBAT firmware filter frequency
+        type: u8
+        start: 5
+        end: 7
       haptic_en:
         description: Enable haptics mode
         type: bool
@@ -1289,7 +1373,7 @@ registers:
     size_bits: 16
     fields:
       pvdd_cnv_dsp:
-        description:  SAR ADC PVDD conversion
+        description: SAR ADC PVDD conversion
         type: u16
         start: 6
         end: 16
