@@ -1,27 +1,17 @@
 //! Low level interface for the TAS2563 chipset providing register access.
 
+pub mod i2c;
+
 #[cfg(test)]
 mod test;
 
 use bitvec::array::BitArray;
 use device_driver::{AddressableDevice, AsyncRegisterDevice};
-use embedded_hal_async::i2c::I2c;
 
 const MAX_TRANSACTION_SIZE: usize = 3;
 
-#[derive(Clone, Copy)]
-#[repr(u8)]
-pub enum Address {
-    Global = 0x48,
-    Address0x4C = 0x4C,
-    Address0x4D = 0x4D,
-    Address0x4E = 0x4E,
-    Address0x4F = 0x4F,
-}
-
-pub struct Tas2563Device<I2C> {
-    address: Address,
-    i2c: I2C,
+pub struct Tas2563Device<T> {
+    interface: T,
     last_page: Option<u8>,
     last_book: Option<u8>,
 }
@@ -49,15 +39,26 @@ impl Into<u32> for RegisterAddress {
     }
 }
 
-impl<I2C> AddressableDevice for Tas2563Device<I2C> {
+pub trait Tas2563Interface {
+    type Error;
+
+    async fn write(&mut self, buf: &[u8]) -> Result<(), Self::Error>;
+    async fn write_read(
+        &mut self,
+        write_buf: &[u8],
+        read_buf: &mut [u8],
+    ) -> Result<(), Self::Error>;
+}
+
+impl<T> AddressableDevice for Tas2563Device<T> {
     type AddressType = u32;
 }
 
-impl<I2C> AsyncRegisterDevice for Tas2563Device<I2C>
+impl<T> AsyncRegisterDevice for Tas2563Device<T>
 where
-    I2C: I2c,
+    T: Tas2563Interface,
 {
-    type Error = I2C::Error;
+    type Error = T::Error;
 
     async fn write_register<const SIZE_BYTES: usize>(
         &mut self,
@@ -74,7 +75,7 @@ where
         buf[1..data.len() + 1].copy_from_slice(data);
         let buf = &buf[0..data.len() + 1];
 
-        self.i2c.write(self.address as u8, buf).await
+        self.interface.write(buf).await
     }
 
     async fn read_register<const SIZE_BYTES: usize>(
@@ -85,56 +86,23 @@ where
         let address = RegisterAddress::from(address);
         self.ensure_book_page(&address).await?;
 
-        self.i2c
-            .write_read(
-                self.address as u8,
-                &[address.register],
-                data.as_raw_mut_slice(),
-            )
+        self.interface
+            .write_read(&[address.register], data.as_raw_mut_slice())
             .await
     }
 }
 
-impl<I2C> Tas2563Device<I2C>
+impl<T> Tas2563Device<T>
 where
-    I2C: I2c,
+    Self: AsyncRegisterDevice + AddressableDevice<AddressType = u32>,
 {
-    pub fn new(i2c: I2C, address: Address) -> Self {
-        Self {
-            i2c,
-            address,
-            last_page: None,
-            last_book: None,
-        }
-    }
-
-    pub fn take(self) -> I2C {
-        self.i2c
-    }
-
-    async fn ensure_book_page(&mut self, address: &RegisterAddress) -> Result<(), I2C::Error> {
-        if self.last_page != Some(address.page) {
-            self.i2c
-                .write(self.address as u8, &[0x00, address.page])
-                .await?;
-            self.last_page = Some(address.page);
-        }
-        if self.last_book != Some(address.book) {
-            self.i2c
-                .write(self.address as u8, &[0x7f, address.book])
-                .await?;
-            self.last_book = Some(address.book);
-        }
-        Ok(())
-    }
-
     pub async fn write_register_direct(
         &mut self,
         book: u8,
         page: u8,
         register: u8,
         value: u8,
-    ) -> Result<(), I2C::Error> {
+    ) -> Result<(), <Self as AsyncRegisterDevice>::Error> {
         self.write_register(
             RegisterAddress {
                 book,
@@ -153,10 +121,27 @@ where
     }
 }
 
+impl<T> Tas2563Device<T>
+where
+    T: Tas2563Interface,
+{
+    async fn ensure_book_page(&mut self, address: &RegisterAddress) -> Result<(), T::Error> {
+        if self.last_page != Some(address.page) {
+            self.interface.write(&[0x00, address.page]).await?;
+            self.last_page = Some(address.page);
+        }
+        if self.last_book != Some(address.book) {
+            self.interface.write(&[0x7f, address.book]).await?;
+            self.last_book = Some(address.book);
+        }
+        Ok(())
+    }
+}
+
 pub mod registers {
     use super::*;
     use crate::prelude::*;
 
     #[device_driver_macros::implement_device_from_file(yaml = "src/ll/ll.yaml")]
-    impl<I2C> Tas2563Device<I2C> {}
+    impl<T> Tas2563Device<T> {}
 }

@@ -1,6 +1,6 @@
 use embedded_hal_mock::eh1::i2c::{Mock, Transaction};
 
-use super::{Address, Tas2563Device};
+use super::{i2c::Address, Tas2563Device};
 use crate::prelude::*;
 
 fn reg(register: u8, value: u8) -> Transaction {
@@ -95,7 +95,7 @@ async fn example() {
     ];
     let mut i2c = Mock::new(&expectations);
 
-    let mut ll = Tas2563Device::new(&mut i2c, Address::Global);
+    let mut ll = Tas2563Device::new_i2c(&mut i2c, Address::Global);
     ll.pwr_ctl()
         .write_async(|w| w.mode(Mode::Mute).vsns_pd(true).isns_pd(true))
         .await

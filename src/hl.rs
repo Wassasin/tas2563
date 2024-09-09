@@ -1,12 +1,8 @@
 //! High level interface for the Bq2515x family of chips providing convenience methods and a Rust-style interface.
 
-mod lowpower;
-
-pub use lowpower::*;
-
 use embedded_hal_async::i2c::I2c;
 
-use crate::ll::Bq2515xDevice;
+use crate::ll::Tas2563Device;
 use crate::prelude::*;
 
 /// High level interface for the Bq2515x family of chips.
