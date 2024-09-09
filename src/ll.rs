@@ -155,7 +155,7 @@ where
 
 pub mod registers {
     use super::*;
-    // use crate::prelude::*;
+    use crate::prelude::*;
 
     #[device_driver_macros::implement_device_from_file(yaml = "src/ll/ll.yaml")]
     impl<I2C> Tas2563Device<I2C> {}

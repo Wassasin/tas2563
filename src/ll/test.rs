@@ -82,49 +82,16 @@ async fn example() {
         reg(0x38, 0x20),
         // Set vbat averaging and filter
         reg(0x3b, 0x38),
-        // reg(0x3c, 0x38),
-        // reg(0x3d, 0x08),
-        // reg(0x3e, 0x10),
-        // reg(0x3f, 0x00),
-        // reg(0x40, 0x40),
-        // reg(0x30, 0x19),
-        // reg(0x02, 0x00),
-        // reg(0x01, 0x80),
-        // reg(0x02, 0x00),
-        // reg(0x03, 0x20),
-        // reg(0x04, 0xf6),
-        // reg(0x06, 0x09),
-        // reg(0x07, 0x02),
-        // reg(0x08, 0x7a),
-        // reg(0x09, 0x10),
-        // reg(0x0a, 0x03),
-        // reg(0x0b, 0x44),
-        // reg(0x0c, 0x40),
-        // reg(0x0d, 0x04),
-        // reg(0x0e, 0x05),
-        // reg(0x0f, 0x06),
-        // reg(0x10, 0x07),
-        // reg(0x12, 0x13),
-        // reg(0x13, 0x76),
-        // reg(0x14, 0x01),
-        // reg(0x15, 0x2e),
-        // reg(0x1a, 0xfc),
-        // reg(0x1b, 0xa6),
-        // reg(0x1c, 0xdf),
-        // reg(0x1d, 0xff),
-        // reg(0x30, 0x19),
-        // reg(0x31, 0x40),
-        // reg(0x32, 0x81),
-        // reg(0x33, 0x34),
-        // reg(0x34, 0x46),
-        // reg(0x35, 0x84),
-        // reg(0x38, 0x20),
-        // reg(0x3b, 0x38),
-        // reg(0x3c, 0x38),
-        // reg(0x3d, 0x08),
-        // reg(0x3e, 0x10),
-        // reg(0x3f, 0x00),
-        // reg(0x40, 0x40),
+        // Set retry_timer to default value
+        reg(0x3c, 0x38),
+        // Set hold_sar_update to default value
+        reg(0x3d, 0x08),
+        // Set idle_channel to default value
+        reg(0x3e, 0x10),
+        // Disable tone generator
+        reg(0x3f, 0x00),
+        // Set Boost peak current limit to 0.99A with a Soft Start Current Limit of '1'
+        reg(0x40, 0x40),
     ];
     let mut i2c = Mock::new(&expectations);
 
@@ -331,6 +298,23 @@ async fn example() {
                 .vbat_dsp_lpf_reg(0b01)
                 .haptic_en(false)
         })
+        .await
+        .unwrap();
+
+    ll.retry_timer().write_async(|w| w).await.unwrap();
+    ll.hold_sar_update().write_async(|w| w).await.unwrap();
+    ll.idle_channel().write_async(|w| w).await.unwrap();
+
+    ll.tg_cfg_0()
+        .write_async(|w| {
+            w.tg_1_pinen(Tg1Pinen::Disabled)
+                .tg_1_en(Tg1En::PinTriggered)
+        })
+        .await
+        .unwrap();
+
+    ll.bst_ilim_cfg_0()
+        .write_async(|w| w.bst_ilim(BoostPeakCurrentMaxRun(0)).bst_ssl(0x1))
         .await
         .unwrap();
 

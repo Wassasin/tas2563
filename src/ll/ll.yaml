@@ -1185,11 +1185,86 @@ registers:
         description: Enable haptics mode
         type: bool
         start: 7
+  retry_timer:
+    description: Retry Timer
+    rw_type: rw
+    address: 0x3C
+    size_bits: 8
+    reset_value: 0x38
+    fields:
+      retry_wait_tm:
+        description: Retry wait time for OC,OT,CLK ERR DETECTION and VBAT_POR
+        type: u8
+        start: 0
+        end: 2
+      classh_release_timer:
+        description: Delay of class H controls in terms of number of samples
+        type: u8
+        start: 2
+        end: 7
+  hold_sar_update:
+    rw_type: rw
+    address: 0x3D
+    size_bits: 8
+    reset_value: 0x08
+    fields:
+      sar_data_hold_update:
+        description: Hold SAR VBAT and Temp update during register readback
+        type: bool
+        start: 0
+      averaging_timer_init_ldg_mode_reg:
+        description: Duration of Averaging done by the firmware on V/I data
+        type: u8
+        start: 1
+        end: 3
+      switch_aux_scheme_ldg_reg:
+        description: Auxiliary Clock Scheme in Load diagnostic Mode
+        type: bool
+        start: 3
+      switch_aux_scheme_beep_mode:
+        description: Auxiliary Clock Scheme in beep mode
+        type: bool
+        start: 4
+  idle_channel:
+    rw_type: rw
+    address: 0x3E
+    size_bits: 8
+    reset_value: 0x10
+    fields:
+      mask_idle_ch_misc:
+        description: Mask the idle ch detc reaction on MISC
+        type: bool
+        start: 0
+      mask_idle_ch_ivsense:
+        description: Mask the idle ch detc reaction on IVSENSE
+        type: bool
+        start: 1
+      mask_idle_ch_cp:
+        description: Mask the idle ch detc reaction on CP
+        type: bool
+        start: 2
+      mask_idle_ch_classd:
+        description: Mask the idle ch detc reaction on ClassD
+        type: bool
+        start: 3
+      enable_idle_ch_detect:
+        description: Enable the Idle Detection Scheme
+        type: bool
+        start: 4
+      noise_gate_enable:
+        description: Noise Gate (analog classD mute) feature idle channel
+        type: bool
+        start: 5
+      noise_gate_user_ctrl:
+        description: Noise Gate (analog classD mute) feature user controlled
+        type: bool
+        start: 6
   tg_cfg0:
     description: Tone Generator
     rw_type: rw
     address: 0x3F
     size_bits: 8
+    reset_value: 0x00
     fields:
       tg1_pinen:
         description: Tone pin trigger
@@ -1215,13 +1290,19 @@ registers:
     rw_type: rw
     address: 0x40
     size_bits: 8
+    reset_value: 0x76
     fields:
       bst_ilim:
         description: Boost peak current limit
         type: u8
         start: 0
         end: 6
-        # todo strict conversion
+        strict_conversion: BoostPeakCurrentMaxRun
+      bst_ssl:
+        description: Boost Soft Start Current Limit
+        type: u8
+        start: 6
+        end: 8
   pdm_config0:
     rw_type: rw
     address: 0x41
