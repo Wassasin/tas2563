@@ -1,14 +1,13 @@
 //! Low level interface for the TAS2563 chipset providing register access.
 
 pub mod i2c;
+pub mod spi;
 
 #[cfg(test)]
 mod test;
 
 use bitvec::array::BitArray;
 use device_driver::{AddressableDevice, AsyncRegisterDevice};
-
-const MAX_TRANSACTION_SIZE: usize = 3;
 
 pub struct Tas2563Device<T> {
     interface: T,

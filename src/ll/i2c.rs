@@ -1,6 +1,8 @@
 use embedded_hal_async::i2c::I2c;
 
-use super::{Tas2563Device, Tas2563Interface, MAX_TRANSACTION_SIZE};
+use super::{Tas2563Device, Tas2563Interface};
+
+const MAX_TRANSACTION_SIZE: usize = 3;
 
 #[derive(Clone, Copy)]
 #[repr(u8)]
