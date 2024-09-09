@@ -42,16 +42,29 @@ impl Into<u32> for RegisterAddress {
 pub trait Tas2563Interface {
     type Error;
 
-    async fn write(&mut self, buf: &[u8]) -> Result<(), Self::Error>;
-    async fn write_read(
-        &mut self,
-        write_buf: &[u8],
-        read_buf: &mut [u8],
-    ) -> Result<(), Self::Error>;
+    async fn write(&mut self, register: u8, data: &[u8]) -> Result<(), Self::Error>;
+    async fn read(&mut self, register: u8, data: &mut [u8]) -> Result<(), Self::Error>;
 }
 
 impl<T> AddressableDevice for Tas2563Device<T> {
     type AddressType = u32;
+}
+
+impl<T> Tas2563Device<T>
+where
+    T: Tas2563Interface,
+{
+    async fn ensure_book_page(&mut self, address: &RegisterAddress) -> Result<(), T::Error> {
+        if self.last_page != Some(address.page) {
+            self.interface.write(0x00, &[address.page]).await?;
+            self.last_page = Some(address.page);
+        }
+        if self.last_book != Some(address.book) {
+            self.interface.write(0x7f, &[address.book]).await?;
+            self.last_book = Some(address.book);
+        }
+        Ok(())
+    }
 }
 
 impl<T> AsyncRegisterDevice for Tas2563Device<T>
@@ -68,14 +81,9 @@ where
         let address = RegisterAddress::from(address);
         self.ensure_book_page(&address).await?;
 
-        let data = data.as_raw_slice();
-
-        let mut buf = [0u8; MAX_TRANSACTION_SIZE];
-        buf[0] = address.register;
-        buf[1..data.len() + 1].copy_from_slice(data);
-        let buf = &buf[0..data.len() + 1];
-
-        self.interface.write(buf).await
+        self.interface
+            .write(address.register, data.as_raw_slice())
+            .await
     }
 
     async fn read_register<const SIZE_BYTES: usize>(
@@ -87,7 +95,7 @@ where
         self.ensure_book_page(&address).await?;
 
         self.interface
-            .write_read(&[address.register], data.as_raw_mut_slice())
+            .read(address.register, data.as_raw_mut_slice())
             .await
     }
 }
@@ -118,23 +126,6 @@ where
     pub fn reset_assumptions(&mut self) {
         self.last_book = None;
         self.last_page = None;
-    }
-}
-
-impl<T> Tas2563Device<T>
-where
-    T: Tas2563Interface,
-{
-    async fn ensure_book_page(&mut self, address: &RegisterAddress) -> Result<(), T::Error> {
-        if self.last_page != Some(address.page) {
-            self.interface.write(&[0x00, address.page]).await?;
-            self.last_page = Some(address.page);
-        }
-        if self.last_book != Some(address.book) {
-            self.interface.write(&[0x7f, address.book]).await?;
-            self.last_book = Some(address.book);
-        }
-        Ok(())
     }
 }
 

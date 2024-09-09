@@ -1,6 +1,6 @@
 use embedded_hal_async::i2c::I2c;
 
-use super::{Tas2563Device, Tas2563Interface};
+use super::{Tas2563Device, Tas2563Interface, MAX_TRANSACTION_SIZE};
 
 #[derive(Clone, Copy)]
 #[repr(u8)]
@@ -20,13 +20,17 @@ pub struct I2CInterface<T: I2c> {
 impl<T: I2c> Tas2563Interface for I2CInterface<T> {
     type Error = T::Error;
 
-    async fn write(&mut self, buf: &[u8]) -> Result<(), T::Error> {
+    async fn write(&mut self, register: u8, data: &[u8]) -> Result<(), T::Error> {
+        let mut buf: [u8; 3] = [0u8; MAX_TRANSACTION_SIZE];
+        buf[0] = register;
+        buf[1..data.len() + 1].copy_from_slice(data);
+        let buf = &buf[0..data.len() + 1];
         self.i2c.write(self.address as u8, buf).await
     }
 
-    async fn write_read(&mut self, write_buf: &[u8], read_buf: &mut [u8]) -> Result<(), T::Error> {
+    async fn read(&mut self, register: u8, data: &mut [u8]) -> Result<(), T::Error> {
         self.i2c
-            .write_read(self.address as u8, write_buf, read_buf)
+            .write_read(self.address as u8, &[register], data)
             .await
     }
 }
