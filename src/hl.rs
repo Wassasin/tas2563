@@ -1,8 +1,12 @@
-//! High level interface for the Bq2515x family of chips providing convenience methods and a Rust-style interface.
+//! High level interface for the TAS2563 chipset providing convenience methods and a Rust-style interface.
 
-use embedded_hal_async::i2c::I2c;
+use embedded_hal_async::{i2c::I2c, spi::SpiDevice};
 
-use crate::ll::Tas2563Device;
+use crate::ll::{
+    i2c::{Address, I2CInterface},
+    spi::SPIInterface,
+    Tas2563Device, Tas2563Interface,
+};
 use crate::prelude::*;
 
 /// High level interface for the Bq2515x family of chips.
@@ -11,91 +15,95 @@ use crate::prelude::*;
 /// * Permanently tying the *not-low-power* (/LP) pin to low.
 /// * Manually pulling the *not-low-power* (/LP) pin to low and awaiting the prequisite time when planning to use the device.
 /// * Use the [Bq2515xLowPower] interface to manage the *not-low-power* (/LP) pin for you.
-pub struct Bq2515x<I2C> {
-    dev: Bq2515xDevice<I2C>,
+pub struct Tas2563<T> {
+    dev: Tas2563Device<T>,
 }
 
-pub enum LdoConfig {
-    Off,
-    Switch,
-    Ldo(LDOOutputVoltage),
-}
-
-impl<I2C> Bq2515x<I2C>
+impl<T> Tas2563<I2CInterface<T>>
 where
-    I2C: I2c,
+    T: I2c,
 {
-    pub fn new(i2c: I2C) -> Self {
+    pub fn new_i2c(i2c: T, address: Address) -> Self {
         Self {
-            dev: Bq2515xDevice::new(i2c),
+            dev: Tas2563Device::new_i2c(i2c, address),
         }
     }
 
-    /// Get access to the underlying low level device.
-    pub fn ll(&mut self) -> &mut Bq2515xDevice<I2C> {
-        &mut self.dev
-    }
-
-    pub fn take(self) -> I2C {
+    pub fn take(self) -> T {
         self.dev.take()
     }
+}
 
-    /// Configure the LDO pin.
-    pub async fn ldo(&mut self, config: LdoConfig) -> Result<(), I2C::Error> {
-        self.dev
-            .ldoctrl()
-            .write_async(|w| match config {
-                LdoConfig::Off => w.en_ls_ldo(false),
-                LdoConfig::Switch => w.en_ls_ldo(true).ldo_switch_config(LdoSwitchConfig::Switch),
-                LdoConfig::Ldo(v) => w
-                    .en_ls_ldo(true)
-                    .ldo_switch_config(LdoSwitchConfig::Ldo)
-                    .vldo(v),
-            })
-            .await
+impl<T> Tas2563<SPIInterface<T>>
+where
+    T: SpiDevice,
+{
+    pub fn new_i2c(spi: T) -> Self {
+        Self {
+            dev: Tas2563Device::new_spi(spi),
+        }
     }
 
-    /// Set the mode by which the ADC samples.
-    pub async fn adc_set_mode(&mut self, mode: AdcReadRate) -> Result<(), I2C::Error> {
-        self.dev
-            .adcctrl()
-            .modify_async(|w| w.adc_read_rate(mode))
-            .await
+    pub fn take(self) -> T {
+        self.dev.take()
+    }
+}
+
+impl<T> Tas2563<T> {
+    /// Get access to the underlying low level device.
+    pub fn ll(&mut self) -> &mut Tas2563Device<T> {
+        &mut self.dev
+    }
+}
+
+impl<T> Tas2563<T>
+where
+    T: Tas2563Interface,
+{
+    pub async fn amplification_level_or_mute(
+        &mut self,
+        level: Option<AmpLevel>,
+    ) -> Result<(), T::Error> {
+        if let Some(level) = level {
+            self.dev
+                .pb_cfg_1()
+                .write_async(|w| w.amp_level(level))
+                .await?;
+
+            self.dev
+                .pwr_ctl()
+                .modify_async(|w| w.mode(Mode::Active))
+                .await?;
+        } else {
+            self.dev
+                .pwr_ctl()
+                .modify_async(|w| w.mode(Mode::Mute))
+                .await?;
+        }
+
+        Ok(())
     }
 
-    /// Start an one-shot ADC acquisition.
-    ///
-    /// Sets the ADC mode to 'manual'.
-    ///
-    /// In order to check whether the one shot has completed, you can check the `flags` register.
-    /// Note that when the device is powered by VIN (i.e. Power is Good) the `adc_ready` flag is never set.
-    pub async fn adc_start_one_shot(&mut self) -> Result<(), I2C::Error> {
-        self.dev
-            .adcctrl()
-            .modify_async(|w| {
-                w.adc_read_rate(AdcReadRate::ManualRead)
-                    .adc_conv_start(true)
-            })
-            .await
-    }
-
-    /// Fetch the latest ADC acquisition.
-    pub async fn adc_fetch_latest(&mut self) -> Result<AdcData, I2C::Error> {
-        let channels = self.dev.adc_read_en().read_async().await?;
-        let ilim = self.dev.ilimctrl().read_async().await?.ilim().unwrap();
-        let data = self.dev.adc_data().read_async().await?;
-
-        Ok(AdcData {
-            vin: channels.vin().then(|| RawVoltage(data.vin())),
-            pmid: channels.pmid().then(|| RawVoltage(data.pmid())),
-            iin: channels.iin().then(|| IinCurrent {
-                raw: data.iin(),
-                high_range: ilim > CurrentLimit::_150mA,
-            }),
-            vbat: channels.vbat().then(|| RawVoltage(data.vbat())),
-            ts: channels.ts().then(|| RawVoltage(data.ts())),
-            adcin: channels.adcin().then(|| RawVoltage(data.adcin())),
-            icharge: channels.ichg().then(|| IChargePercentage(data.ichg())),
+    pub async fn adc_vbat(&mut self) -> Result<ADCReadout, T::Error> {
+        Ok(ADCReadout {
+            pvdd: self.dev.pvdd().read_async().await?.pvdd_cnv_dsp(),
+            vbat: self.dev.vbat().read_async().await?.vbat_cnv(),
+            temp: self.dev.temp().read_async().await?.tmp_cnv(),
         })
     }
+
+    // /// Configure the LDO pin.
+    // pub async fn ldo(&mut self, config: LdoConfig) -> Result<(), I2C::Error> {
+    //     self.dev
+    //         .ldoctrl()
+    //         .write_async(|w| match config {
+    //             LdoConfig::Off => w.en_ls_ldo(false),
+    //             LdoConfig::Switch => w.en_ls_ldo(true).ldo_switch_config(LdoSwitchConfig::Switch),
+    //             LdoConfig::Ldo(v) => w
+    //                 .en_ls_ldo(true)
+    //                 .ldo_switch_config(LdoSwitchConfig::Ldo)
+    //                 .vldo(v),
+    //         })
+    //         .await
+    // }
 }

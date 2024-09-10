@@ -24,12 +24,46 @@ impl BoostPeakCurrentMaxRun {
     }
 }
 
+#[derive(From, Into, Debug, PartialEq)]
+pub struct VBatCnv(pub u16);
+
+impl VBatCnv {
+    pub fn to_millivolts(&self) -> u16 {
+        (self.0 as u32 * 1000 / 64) as u16
+    }
+}
+
+#[derive(From, Into, Debug, PartialEq)]
+pub struct PVDDCnv(pub u16);
+
+impl PVDDCnv {
+    pub fn to_millivolts(&self) -> u16 {
+        todo!()
+    }
+}
+
+#[derive(From, Into, Debug, PartialEq)]
+pub struct TempCnv(pub u8);
+
+impl TempCnv {
+    pub fn to_celcius(&self) -> i16 {
+        self.0 as i16 - 93
+    }
+}
+
+#[derive(Debug)]
+pub struct ADCReadout {
+    pub pvdd: PVDDCnv,
+    pub vbat: VBatCnv,
+    pub temp: TempCnv,
+}
+
 #[cfg(test)]
 mod test {
-    use super::BoostPeakCurrentMaxRun;
+    use crate::prelude::{BoostPeakCurrentMaxRun, TempCnv, VBatCnv};
 
-    #[async_std::test]
-    async fn boost_peak_current_max_run() {
+    #[test]
+    fn boost_peak_current_max_run() {
         assert_eq!(
             BoostPeakCurrentMaxRun::from_milliamps(990),
             BoostPeakCurrentMaxRun(0)
@@ -42,5 +76,20 @@ mod test {
             BoostPeakCurrentMaxRun::from_milliamps(4000),
             BoostPeakCurrentMaxRun(0x37)
         );
+    }
+
+    #[test]
+    fn vbat_voltage() {
+        assert_eq!(VBatCnv(0x000).to_millivolts(), 0);
+        assert_eq!(VBatCnv(0x001).to_millivolts(), 15);
+        assert_eq!(VBatCnv(0x100).to_millivolts(), 4000);
+        assert_eq!(VBatCnv(0x180).to_millivolts(), 6000);
+    }
+
+    #[test]
+    fn temperature() {
+        assert_eq!(TempCnv(0x00).to_celcius(), -93);
+        assert_eq!(TempCnv(0x76).to_celcius(), 25);
+        assert_eq!(TempCnv(0xFF).to_celcius(), 162);
     }
 }

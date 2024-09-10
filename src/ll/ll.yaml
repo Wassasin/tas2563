@@ -912,6 +912,7 @@ registers:
         type: u16
         start: 6
         end: 16
+        strict_conversion: VBatCnv
   temp:
     description: SARD ADC Temp conversion
     rw_type: r
@@ -922,6 +923,7 @@ registers:
         type: u8
         start: 0
         end: 8
+        strict_conversion: TempCnv
   int_clk_cfg:
     description: Interrupt IRQZ configuration
     rw_type: rw
@@ -1458,6 +1460,7 @@ registers:
         type: u16
         start: 6
         end: 16
+        strict_conversion: PVDDCnv
   rev_id:
     description: Revision and PG identifiers
     rw_type: r
