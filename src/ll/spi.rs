@@ -11,7 +11,7 @@ impl<T: SpiDevice> Tas2563Interface for SPIInterface<T> {
 
     async fn write(&mut self, mut register: u8, data: &[u8]) -> Result<(), T::Error> {
         for b in data {
-            self.spi.write(&[register, *b]).await?;
+            self.spi.write(&[register << 1, *b]).await?;
             register += 1;
         }
         Ok(())
