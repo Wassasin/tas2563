@@ -10,7 +10,7 @@ use bitvec::array::BitArray;
 use device_driver::{AddressableDevice, AsyncRegisterDevice};
 
 pub struct Tas2563Device<T> {
-    interface: T,
+    iface: T,
     last_page: Option<u8>,
     last_book: Option<u8>,
 }
@@ -41,8 +41,36 @@ impl Into<u32> for RegisterAddress {
 pub trait Tas2563Interface {
     type Error;
 
-    async fn write(&mut self, register: u8, data: &[u8]) -> Result<(), Self::Error>;
-    async fn read(&mut self, register: u8, data: &mut [u8]) -> Result<(), Self::Error>;
+    /// Write data in burst to the peripheral.
+    ///
+    /// The first element in data is the first register address to write to.
+    /// If the interface does not support burst write, it is required to unwrap the burst write into
+    /// separate single register writes.
+    async fn write_burst(&mut self, data: &[u8]) -> Result<(), Self::Error>;
+
+    /// Read a series of register values from the peripheral.
+    ///
+    /// If the interface does not support multibyte read, it is required to unwrap the read into
+    /// separate single register reads.
+    async fn read_registers(&mut self, register: u8, values: &mut [u8]) -> Result<(), Self::Error>;
+
+    /// Convenience function to create a single register write.
+    async fn write_register(&mut self, register: u8, value: u8) -> Result<(), Self::Error> {
+        self.write_burst(&[register, value]).await
+    }
+
+    /// Convenience function to create a multi register write.
+    async fn write_registers(
+        &mut self,
+        mut register: u8,
+        values: &[u8],
+    ) -> Result<(), Self::Error> {
+        for v in values {
+            self.write_register(register, *v).await?;
+            register += 1;
+        }
+        Ok(())
+    }
 }
 
 impl<T> AddressableDevice for Tas2563Device<T> {
@@ -55,14 +83,18 @@ where
 {
     async fn ensure_book_page(&mut self, address: &RegisterAddress) -> Result<(), T::Error> {
         if self.last_page != Some(address.page) {
-            self.interface.write(0x00, &[address.page]).await?;
+            self.iface.write_register(0x00, address.page).await?;
             self.last_page = Some(address.page);
         }
         if self.last_book != Some(address.book) {
-            self.interface.write(0x7f, &[address.book]).await?;
+            self.iface.write_register(0x7f, address.book).await?;
             self.last_book = Some(address.book);
         }
         Ok(())
+    }
+
+    pub fn interface(&mut self) -> &mut T {
+        &mut self.iface
     }
 }
 
@@ -80,8 +112,8 @@ where
         let address = RegisterAddress::from(address);
         self.ensure_book_page(&address).await?;
 
-        self.interface
-            .write(address.register, data.as_raw_slice())
+        self.iface
+            .write_registers(address.register, data.as_raw_slice())
             .await
     }
 
@@ -93,8 +125,8 @@ where
         let address = RegisterAddress::from(address);
         self.ensure_book_page(&address).await?;
 
-        self.interface
-            .read(address.register, data.as_raw_mut_slice())
+        self.iface
+            .read_registers(address.register, data.as_raw_mut_slice())
             .await
     }
 }
@@ -103,25 +135,6 @@ impl<T> Tas2563Device<T>
 where
     Self: AsyncRegisterDevice + AddressableDevice<AddressType = u32>,
 {
-    pub async fn write_register_direct(
-        &mut self,
-        book: u8,
-        page: u8,
-        register: u8,
-        value: u8,
-    ) -> Result<(), <Self as AsyncRegisterDevice>::Error> {
-        self.write_register(
-            RegisterAddress {
-                book,
-                page,
-                register,
-            }
-            .into(),
-            &BitArray::new([value]),
-        )
-        .await
-    }
-
     pub fn reset_assumptions(&mut self) {
         self.last_book = None;
         self.last_page = None;

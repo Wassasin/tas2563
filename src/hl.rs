@@ -84,7 +84,7 @@ where
         Ok(())
     }
 
-    pub async fn adc_vbat(&mut self) -> Result<ADCReadout, T::Error> {
+    pub async fn adc(&mut self) -> Result<ADCReadout, T::Error> {
         Ok(ADCReadout {
             pvdd: self.dev.pvdd().read_async().await?.pvdd_cnv_dsp(),
             vbat: self.dev.vbat().read_async().await?.vbat_cnv(),

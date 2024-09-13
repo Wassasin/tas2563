@@ -9,15 +9,16 @@ pub struct SPIInterface<T: SpiDevice> {
 impl<T: SpiDevice> Tas2563Interface for SPIInterface<T> {
     type Error = T::Error;
 
-    async fn write(&mut self, mut register: u8, data: &[u8]) -> Result<(), T::Error> {
-        for b in data {
-            self.spi.write(&[register << 1, *b]).await?;
+    async fn write_burst(&mut self, data: &[u8]) -> Result<(), T::Error> {
+        let mut register = data[0];
+        for b in &data[1..] {
+            self.write_register(register, *b).await?;
             register += 1;
         }
         Ok(())
     }
 
-    async fn read(&mut self, mut register: u8, data: &mut [u8]) -> Result<(), T::Error> {
+    async fn read_registers(&mut self, mut register: u8, data: &mut [u8]) -> Result<(), T::Error> {
         let mut buf = [0u8; 2];
         for b in data {
             buf[0] = register << 1 | 0b1;
@@ -28,6 +29,10 @@ impl<T: SpiDevice> Tas2563Interface for SPIInterface<T> {
         }
         Ok(())
     }
+
+    async fn write_register(&mut self, register: u8, value: u8) -> Result<(), Self::Error> {
+        self.spi.write(&[register << 1, value]).await
+    }
 }
 
 impl<T> Tas2563Device<SPIInterface<T>>
@@ -36,13 +41,13 @@ where
 {
     pub fn new_spi(spi: T) -> Self {
         Self {
-            interface: SPIInterface { spi },
+            iface: SPIInterface { spi },
             last_page: None,
             last_book: None,
         }
     }
 
     pub fn take(self) -> T {
-        self.interface.spi
+        self.iface.spi
     }
 }

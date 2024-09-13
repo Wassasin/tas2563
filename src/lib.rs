@@ -6,4 +6,4 @@ pub mod hl;
 pub mod ll;
 pub mod prelude;
 
-mod commands;
+mod bulk;
