@@ -61,7 +61,8 @@ impl<'a> Iterator for CommandIterator<'a> {
 
         let (entry, remainder) = self.commands.split_at(2);
         let (command, remainder) = if entry[0] == CFG_META_BURST {
-            let (burst, remainder) = remainder.split_at(entry[1] as usize);
+            // Note(2): the address and first value are not part of the burst count
+            let (burst, remainder) = remainder.split_at(entry[1] as usize + 2);
             (Command::WriteBurst(BurstCommand { data: burst }), remainder)
         } else {
             (
@@ -83,6 +84,7 @@ impl<'a> BurstCommand<'a> {
         self.data
     }
 }
+
 #[cfg(test)]
 mod test {
     use crate::bulk::BurstCommand;

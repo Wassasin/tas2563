@@ -1,0 +1,33 @@
+use crate::ast::{Commands, Command, WriteCommand};
+
+grammar;
+
+match {
+    "w",
+    "d",
+    ">",
+    r"[0-9a-f]{2}",
+
+    // Skip whitespace and comments
+    r"\s*" => { },
+    r"#[^\n\r]*[\n\r]*" => { },
+}
+
+pub Commands: Commands = {
+    <cs: Command*> => Commands(cs),
+}
+
+Command: Command = {
+    "w" <address:Num> <register:Num> <value:Num> <extra_values:ExtraValue*> => {
+        let mut values = vec![value];
+        values.extend(extra_values);
+        Command::Write(WriteCommand { address, register, bytes: values })
+    },
+    "d" <duration:Num> => Command::Delay(duration),
+};
+
+ExtraValue: u8 = {
+    ">"? <value:Num> => value
+};
+
+Num: u8 = <s:r"[0-9a-f]{2}"> => u8::from_str_radix(s, 16).unwrap();
