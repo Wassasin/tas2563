@@ -61,8 +61,16 @@ impl<'a> Iterator for CommandIterator<'a> {
 
         let (entry, remainder) = self.commands.split_at(2);
         let (command, remainder) = if entry[0] == CFG_META_BURST {
+            let data_len = entry[1] as usize;
             // Note(2): the address and first value are not part of the burst count
-            let (burst, remainder) = remainder.split_at(entry[1] as usize + 2);
+            let (burst, remainder) = remainder.split_at(data_len + 1);
+
+            let remainder = if data_len % 2 == 0 {
+                &remainder[1..] // Skip zero-padding
+            } else {
+                remainder
+            };
+
             (Command::WriteBurst(BurstCommand { data: burst }), remainder)
         } else {
             (
@@ -91,50 +99,76 @@ mod test {
 
     use super::{Command, CommandIterator, RegisterWrite, CFG_META_BURST};
 
-    pub const TEST_COMMANDS: [u8; 12] = [
-        0x00,
-        0x00,
-        0x7f,
-        0x00,
-        CFG_META_BURST,
-        4,
-        0x08,
-        0x00,
-        0xfe,
-        0x20,
-        0x05,
-        0x44,
-    ];
-
     #[test]
-    fn commands() {
-        let mut it = CommandIterator::new(&TEST_COMMANDS);
+    fn commands_burst_even() {
+        let mut it = CommandIterator::new(&[
+            0x5a,
+            0x0f,
+            CFG_META_BURST,
+            0x02,
+            0x5c,
+            0x0f,
+            0xa0,
+            0x00,
+            0x5e,
+            0x01,
+        ]);
 
         assert_eq!(
             it.next(),
             Some(Command::WriteSingle(RegisterWrite {
-                register: 0x00,
-                value: 0x00
-            }))
-        );
-        assert_eq!(
-            it.next(),
-            Some(Command::WriteSingle(RegisterWrite {
-                register: 0x7f,
-                value: 0x00
+                register: 0x5a,
+                value: 0x0f
             }))
         );
         assert_eq!(
             it.next(),
             Some(Command::WriteBurst(BurstCommand {
-                data: &[0x08, 0x00, 0xfe, 0x20,]
+                data: &[0x5c, 0x0f, 0xa0],
             }))
         );
         assert_eq!(
             it.next(),
             Some(Command::WriteSingle(RegisterWrite {
-                register: 0x05,
-                value: 0x44
+                register: 0x5e,
+                value: 0x01
+            }))
+        );
+    }
+
+    #[test]
+    fn commands_burst_odd() {
+        let mut it = CommandIterator::new(&[
+            0x5a,
+            0x0f,
+            CFG_META_BURST,
+            0x03,
+            0x5c,
+            0x0f,
+            0xa0,
+            0xc5,
+            0x5e,
+            0x01,
+        ]);
+
+        assert_eq!(
+            it.next(),
+            Some(Command::WriteSingle(RegisterWrite {
+                register: 0x5a,
+                value: 0x0f
+            }))
+        );
+        assert_eq!(
+            it.next(),
+            Some(Command::WriteBurst(BurstCommand {
+                data: &[0x5c, 0x0f, 0xa0, 0xc5],
+            }))
+        );
+        assert_eq!(
+            it.next(),
+            Some(Command::WriteSingle(RegisterWrite {
+                register: 0x5e,
+                value: 0x01
             }))
         );
     }

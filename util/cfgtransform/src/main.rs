@@ -15,7 +15,7 @@ fn main() {
     let cmds = grammar::CommandsParser::new().parse(&f).unwrap();
 
     let mut f = BufWriter::new(std::fs::File::create("example/test.bulk").unwrap());
-    for b in bulk::BulkGenerator::generate(&cmds) {
+    for b in bulk::BulkGenerator::generate(cmds.into_iter()) {
         f.write(&[b]).unwrap();
     }
     f.flush().unwrap();
@@ -44,8 +44,11 @@ mod test {
         ";
 
         let cmds = crate::grammar::CommandsParser::new().parse(src).unwrap();
-        let bulk = crate::bulk::BulkGenerator::generate(&cmds).collect::<Vec<_>>();
+        let bulk = crate::bulk::BulkGenerator::generate(cmds.into_iter()).collect::<Vec<_>>();
 
-        assert_eq!(bulk, &[0, 0, 127, 0, 0, 5, 253, 4, 84, 0, 0, 0, 0, 8, 63]);
+        assert_eq!(
+            bulk,
+            &[0, 0, 127, 0, 0, 5, 253, 4, 84, 0, 0, 0, 0, 0, 8, 63]
+        );
     }
 }
