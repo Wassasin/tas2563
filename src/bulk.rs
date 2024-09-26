@@ -55,6 +55,9 @@ impl<'a> Iterator for CommandIterator<'a> {
     type Item = Command<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.commands.len() == 0 {
+            return None;
+        }
         if self.commands.len() == 1 {
             panic!("Only one byte remaining, expected two");
         }

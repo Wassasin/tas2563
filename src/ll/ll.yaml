@@ -910,7 +910,7 @@ registers:
     fields:
       vbat_cnv:
         type: u16
-        start: 6
+        start: 0
         end: 16
         strict_conversion: VBatCnv
   temp:
@@ -1458,7 +1458,7 @@ registers:
       pvdd_cnv_dsp:
         description: SAR ADC PVDD conversion
         type: u16
-        start: 6
+        start: 0
         end: 16
         strict_conversion: PVDDCnv
   rev_id:

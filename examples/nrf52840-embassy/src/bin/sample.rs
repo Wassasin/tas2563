@@ -7,13 +7,11 @@ use defmt::info;
 use embassy_executor::Spawner;
 use embassy_nrf::{
     bind_interrupts,
-    gpio::{Level, Output, OutputDrive},
     i2s::{self, Channels, DoubleBuffering, MasterClock, Sample as _, SampleWidth, I2S},
     peripherals,
     twim::{self, Frequency},
 };
-use embassy_time::{Delay, Duration, Timer};
-use embedded_hal_async::i2c::I2c;
+use embassy_time::Timer;
 use tas2563::{
     ll::{registers::Mode, Tas2563Device},
     prelude::*,
@@ -28,74 +26,13 @@ bind_interrupts!(struct Irqs {
     I2S => i2s::InterruptHandler<peripherals::I2S>;
 });
 
-// async fn initialize<I2C: I2c>(ll: &mut Tas2505Device<I2C>) -> Result<(), I2C::Error> {
-//     // Assert Software reset (P0, R1, D0=1)
-//     ll.write_register_direct(0x00, 0x01, 0x01).await?;
-//     // LDO output programmed as 1.8V and Level shifters powered up. (P1, R2, D5-D4=00, D3=0)
-//     ll.write_register_direct(0x01, 0x02, 0x00).await?;
-//     // PLL_clkin = MCLK, codec_clkin = PLL_CLK, MCLK should be 11.2896MHz (P0, R4, D1-D0=03)
-//     ll.write_register_direct(0x00, 0x04, 0x03).await?;
-//     // Power up PLL, set P=1, R=1, (Page-0, Reg-5)
-//     ll.write_register_direct(0x00, 0x05, 0x91).await?;
-//     // Set J=4, (Page-0, Reg-6)
-//     ll.write_register_direct(0x00, 0x06, 0x04).await?;
-//     // D = 0000, D(13:8) = 0, (Page-0, Reg-7)
-//     ll.write_register_direct(0x00, 0x07, 0x00).await?;
-//     // D(7:0) = 0, (Page-0, Reg-8)
-//     ll.write_register_direct(0x00, 0x08, 0x00).await?;
-//     // add delay of 15 ms for PLL to lock
-//     Timer::after(Duration::from_millis(15)).await;
-//     // DAC NDAC Powered up, NDAC=4 (P0, R11, D7=1, D6-D0=0000100)
-//     ll.write_register_direct(0x00, 0x0B, 0x84).await?;
-//     // DAC MDAC Powered up, MDAC=2 (P0, R12, D7=1, D6-D0=0000010)
-//     ll.write_register_direct(0x00, 0x0C, 0x82).await?;
-//     // DAC OSR(9:0)-> DOSR=128 (P0, R12, D1-D0=00)
-//     ll.write_register_direct(0x00, 0x0D, 0x00).await?;
-//     // DAC OSR(9:0)-> DOSR=128 (P0, R13, D7-D0=10000000)
-//     ll.write_register_direct(0x00, 0x0E, 0x80).await?;
-//     // Codec Interface control Word length = 16bits, BCLK&WCLK inputs, I2S mode. (P0, R27, D7-D6=00, D5-D4=00, D3-D2=00)
-//     ll.write_register_direct(0x00, 0x1B, 0x00).await?;
-//     // Data slot offset 00 (P0, R28, D7-D0=0000)
-//     ll.write_register_direct(0x00, 0x1C, 0x00).await?;
-//     // Dac Instruction programming PRB #2 for Mono routing. Type interpolation (x8) and 3 programmable Biquads. (P0, R60, D4-D0=0010)
-//     ll.write_register_direct(0x00, 0x3C, 0x02).await?;
-//     // DAC powered up, Soft step 1 per Fs. (P0, R63, D7=1, D5-D4=01, D3-D2=00, D1-D0=00)
-//     ll.write_register_direct(0x00, 0x3F, 0x90).await?;
-//     // DAC digital gain 0dB (P0, R65, D7-D0=00000000)
-//     ll.write_register_direct(0x00, 0x41, 0x00).await?;
-//     // DAC volume not muted. (P0, R64, D3=0, D2=1)
-//     ll.write_register_direct(0x00, 0x40, 0x04).await?;
-//     // Master Reference Powered on (P1, R1, D4=1)
-//     ll.write_register_direct(0x01, 0x01, 0x10).await?;
-//     // Output common mode for DAC set to 0.9V (default) (P1, R10)
-//     ll.write_register_direct(0x01, 0x0A, 0x00).await?;
-//     // Mixer P output is connected to HP Out Mixer (P1, R12, D2=1)
-//     ll.write_register_direct(0x01, 0x0C, 0x04).await?;
-//     // HP Volume, 0dB Gain (P1, R22, D6-D0=0000000)
-//     ll.write_register_direct(0x01, 0x16, 0x00).await?;
-//     // No need to enable Mixer M and Mixer P, AINL Voulme, 0dB Gain (P1, R24, D7=1, D6-D0=0000000)
-//     ll.write_register_direct(0x01, 0x18, 0x00).await?;
-//     // Power up HP (P1, R9, D5=1)
-//     ll.write_register_direct(0x01, 0x09, 0x20).await?;
-//     // Unmute HP with 0dB gain (P1, R16, D4=1)
-//     ll.write_register_direct(0x01, 0x10, 0x00).await?;
-//     // SPK attn. Gain =0dB (P1, R46, D6-D0=000000) (0x00)
-//     ll.write_register_direct(0x01, 0x2E, 0x00).await?;
-//     // SPK driver Gain=6.0dB (P1, R48, D6-D4=001) (0x10)
-//     ll.write_register_direct(0x01, 0x30, 0x10).await?;
-//     // SPK powered up (P1, R45, D1=1)
-//     ll.write_register_direct(0x01, 0x2D, 0x02).await?;
-
-//     Ok(())
-// }
-
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     let p = embassy_nrf::init(Default::default());
     info!("running!");
 
-    let sda = p.P1_01;
-    let scl = p.P1_02;
+    let scl: peripherals::P1_01 = p.P1_01;
+    let sda = p.P1_02;
 
     let mck = p.P1_03;
     let bck_sck = p.P1_04;
@@ -122,41 +59,284 @@ async fn main(_spawner: Spawner) {
     //     I2S::new_master(p.I2S, Irqs, mck, bck_sck, wck_lrck, master_clock, config)
     //         .output(din, buffers);
 
-    let mut ll = tas2563::ll::Tas2563Device::new(twim, tas2563::ll::Address::Global);
+    let mut hl = tas2563::hl::Tas2563::new_i2c(twim, tas2563::ll::i2c::Address::Global);
 
-    ll.software_reset()
-        .write_async(|w| w.software_reset(true))
+    {
+        let ll = hl.ll();
+
+        ll.software_reset()
+            .write_async(|w| w.software_reset(true))
+            .await
+            .unwrap();
+
+        let v = ll.software_reset().read_async().await.unwrap();
+        defmt::info!("{:?}", defmt::Debug2Format(&v));
+
+        let v = ll.rev_id().read_async().await.unwrap();
+        defmt::info!("{:?}", defmt::Debug2Format(&v));
+
+        ll.pwr_ctl()
+            .write_async(|w| w.mode(Mode::Mute).vsns_pd(true).isns_pd(true))
+            .await
+            .unwrap();
+
+        ll.pwr_ctl()
+            .write_async(|w| w.mode(Mode::SoftwareShutdown).vsns_pd(true).isns_pd(true))
+            .await
+            .unwrap();
+
+        ll.software_reset()
+            .write_async(|w| w.software_reset(true))
+            .await
+            .unwrap();
+
+        ll.pb_cfg_1()
+            .write_async(|w| w.dis_dc_blocker(false).amp_level(AmpLevel::Unknown))
+            .await
+            .unwrap();
+
+        ll.pwr_ctl()
+            .write_async(|w| w.mode(Mode::SoftwareShutdown).vsns_pd(false).isns_pd(false))
+            .await
+            .unwrap();
+
+        ll.pb_cfg_1()
+            .write_async(|w| w.dis_dc_blocker(false).amp_level(AmpLevel::Amp16DBv0))
+            .await
+            .unwrap();
+
+        ll.misc_cfg_1()
+            .write_async(|w| {
+                w.amp_ss(true)
+                    .irqz_pu(false)
+                    .ote_retry(true)
+                    .oce_retry(true)
+                    .vbat_por_retry(true)
+                    .cp_pg_retry(true)
+            })
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_0()
+            .write_async(|w| {
+                w.frame_start(FrameStart::HighToLow)
+                    .samp_rate(SampRate::Rate48Khz)
+            })
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_1()
+            .write_async(|w| w.rx_offset(0x01))
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_2()
+            .write_async(|w| {
+                w.rx_slen(RxSlen::Length32Bits)
+                    .rx_wlen(RxWlen::Length24Bits)
+                    .rx_scfg(RxScfg::StereoDownmix)
+                    .ivmon_len(IvmonLen::Length16Bits)
+            })
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_3()
+            .write_async(|w| w.rx_slot_l(0x0).rx_slot_r(0x1))
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_4()
+            .write_async(|w| {
+                w.tx_edge(TxEdge::FallingEdge)
+                    .tx_offset(0x1)
+                    .tx_fill(TxFill::Transmit0)
+            })
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_5()
+            .write_async(|w| w.vsns_slot(0x4).vsns_tx(true))
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_6()
+            .write_async(|w| w.isns_slot(0x0).isns_tx(true))
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_7()
+            .write_async(|w| w.vbat_slot(0x4).vbat_tx(false))
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_8()
+            .write_async(|w| w.temp_slot(0x5).temp_tx(false))
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_9()
+            .write_async(|w| w.gain_slot(0x6).gain_tx(false))
+            .await
+            .unwrap();
+
+        ll.tdm_cfg_10()
+            .write_async(|w| w.bst_slot(0x7).bst_tx(false))
+            .await
+            .unwrap();
+
+        ll.lim_cfg_0()
+            .write_async(|w| {
+                w.limb_en(true)
+                    .limb_atk_rt(LimbAtkRt::Step2Samples)
+                    .limb_atk_st(LimbAtkSt::Step0DB5)
+            })
+            .await
+            .unwrap();
+
+        ll.lim_cfg_1()
+            .write_async(|w| {
+                w.limb_hld_tm(LimbHldTm::Time500Ms)
+                    .limb_rls_rt(LimbRlsRt::Step640Ms)
+                    .limb_rls_st(LimbRlsSt::Step0DB5)
+            })
+            .await
+            .unwrap();
+
+        ll.dsp_frequency_bop_cfg_0()
+            .write_async(|w| w.bop_en(true))
+            .await
+            .unwrap();
+
+        ll.bop_cfg_0()
+            .write_async(|w| {
+                w.bop_hld_tm(BopHldTm::Time500Ms)
+                    .bop_atk_st(BopAtkSt::Step1DB0)
+                    .bop_atk_rt(BopAtkRt::Step2Samples)
+            })
+            .await
+            .unwrap();
+
+        ll.int_mask_0().write_async(|w| w).await.unwrap();
+        ll.int_mask_1().write_async(|w| w).await.unwrap();
+        ll.int_mask_2().write_async(|w| w).await.unwrap();
+        ll.int_mask_3().write_async(|w| w).await.unwrap();
+
+        ll.int_clk_cfg()
+            .write_async(|w| w.irqz_pin_cfg(IrqzPinCfg::UnmaskedLatched))
+            .await
+            .unwrap();
+
+        ll.din_pd().write_async(|w| w).await.unwrap();
+
+        ll.misc()
+            .write_async(|w| w.irqz_val(true).irqz_pol(IrqzPol::ActiveLow))
+            .await
+            .unwrap();
+
+        ll.boost_cfg_1()
+            .write_async(|w| {
+                w.bst_dynamic_ilim_en(false)
+                    .bst_pfml(BstPfml::Frequency50Khz)
+                    .bst_en(true)
+                    .bst_mode(BstMode::ClassH)
+            })
+            .await
+            .unwrap();
+
+        ll.boost_cfg_2()
+            .write_async(|w| {
+                w.bst_vreg(BstVreg::Boost8V5)
+                    .bst_pa(BstPa::Phase0Deg)
+                    .bst_sync(false)
+                    .bst_ir(BstIr::Between0UH6And1UH3)
+            })
+            .await
+            .unwrap();
+
+        ll.boost_cfg_3()
+            .write_async(|w| {
+                w.bst_lr(BstLr::LoadReg1V03APerV)
+                    .bst_class_h_step_time(BstClassHStepTime::Step162Us)
+            })
+            .await
+            .unwrap();
+
+        ll.clock_configuration()
+            .write_async(|w| {
+                w.auto_clk(false)
+                    .sbclk_fs_ratio(0b1000)
+                    .sel_madc_div_rev(0x0)
+                    .inv_dac_out_phase(false)
+            })
+            .await
+            .unwrap();
+
+        ll.ramp_frame_select()
+            .write_async(|w| {
+                w.sar_vbat_avg_config(0b11)
+                    .vbat_dsp_lpf_reg(0b01)
+                    .haptic_en(false)
+            })
+            .await
+            .unwrap();
+
+        ll.retry_timer().write_async(|w| w).await.unwrap();
+        ll.hold_sar_update().write_async(|w| w).await.unwrap();
+        ll.idle_channel().write_async(|w| w).await.unwrap();
+
+        ll.tg_cfg_0()
+            .write_async(|w| {
+                w.tg_1_pinen(Tg1Pinen::Disabled)
+                    .tg_1_en(Tg1En::PinTriggered)
+            })
+            .await
+            .unwrap();
+
+        ll.bst_ilim_cfg_0()
+            .write_async(|w| w.bst_ilim(BoostPeakCurrentMaxRun(0)).bst_ssl(0x1))
+            .await
+            .unwrap();
+    }
+
+    tas2563::bulk::CommandIterator::new(include_bytes!(
+        "../../../../util/cfgtransform/example/program_0_Tuning Mode.bulk"
+    ))
+    .write(hl.ll())
+    .await
+    .unwrap();
+
+    tas2563::bulk::CommandIterator::new(include_bytes!(
+        "../../../../util/cfgtransform/example/configuration_0_TuningMode_48KHz_DEV_A_COEFF.bulk"
+    ))
+    .write(hl.ll())
+    .await
+    .unwrap();
+
+    defmt::info!("Configuration loaded");
+
+    hl.ll().reset_assumptions();
+
+    hl.ll()
+        .pb_cfg_1()
+        .write_async(|w| w.dis_dc_blocker(false).amp_level(AmpLevel::Amp16DBv0))
         .await
         .unwrap();
 
-    let v = ll.software_reset().read_async().await.unwrap();
-    defmt::info!("{:?}", defmt::Debug2Format(&v));
-
-    let v = ll.rev_id().read_async().await.unwrap();
-    defmt::info!("{:?}", defmt::Debug2Format(&v));
-
-    ll.bst_ilim_cfg_0()
-        .write_async(|w| w.bst_ilim(0x00))
+    hl.ll()
+        .pwr_ctl()
+        .modify_async(|w| w.vsns_pd(false).isns_pd(false).mode(Mode::Active))
         .await
         .unwrap();
 
-    ll.tg_cfg_0()
-        .modify_async(|w| w.tg_1_en(tas2563::ll::registers::Tg1En::Enabled))
-        .await
-        .unwrap();
-
-    ll.pwr_ctl()
-        .modify_async(|w| w.vsns_pd(true).mode(Mode::LoadDiagnosticsActive))
-        .await
-        .unwrap();
+    defmt::info!("Speaker activated");
 
     loop {
-        let v = ll.temp().read_async().await.unwrap();
-        defmt::info!("{:?}", defmt::Debug2Format(&v));
-        let v = ll.vbat().read_async().await.unwrap();
-        defmt::info!("{:?}", defmt::Debug2Format(&v));
-        let v = ll.pvdd().read_async().await.unwrap();
-        defmt::info!("{:?}", defmt::Debug2Format(&v));
+        let adc = hl.adc().await.unwrap();
+        defmt::info!("{}", defmt::Debug2Format(&adc));
+
+        let adc: ADCReadOutReadable = adc.into();
+        defmt::info!("{}", defmt::Debug2Format(&adc));
+
         Timer::after_secs(1).await;
     }
 

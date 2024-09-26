@@ -38,7 +38,7 @@ impl<T> Tas2563<SPIInterface<T>>
 where
     T: SpiDevice,
 {
-    pub fn new_i2c(spi: T) -> Self {
+    pub fn new_spi(spi: T) -> Self {
         Self {
             dev: Tas2563Device::new_spi(spi),
         }

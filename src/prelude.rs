@@ -24,8 +24,20 @@ impl BoostPeakCurrentMaxRun {
     }
 }
 
-#[derive(From, Into, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct VBatCnv(pub u16);
+
+impl From<u16> for VBatCnv {
+    fn from(value: u16) -> Self {
+        Self(value >> 6) // Assumes BE in device-driver
+    }
+}
+
+impl Into<u16> for VBatCnv {
+    fn into(self) -> u16 {
+        self.0 << 6
+    }
+}
 
 impl VBatCnv {
     pub fn to_millivolts(&self) -> u16 {
@@ -33,12 +45,24 @@ impl VBatCnv {
     }
 }
 
-#[derive(From, Into, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct PVDDCnv(pub u16);
+
+impl From<u16> for PVDDCnv {
+    fn from(value: u16) -> Self {
+        Self(value >> 6) // Assumes BE in device-driver
+    }
+}
+
+impl Into<u16> for PVDDCnv {
+    fn into(self) -> u16 {
+        self.0 << 6
+    }
+}
 
 impl PVDDCnv {
     pub fn to_millivolts(&self) -> u16 {
-        todo!()
+        (self.0 as u32 * 1000 / 64) as u16
     }
 }
 
@@ -56,6 +80,23 @@ pub struct ADCReadout {
     pub pvdd: PVDDCnv,
     pub vbat: VBatCnv,
     pub temp: TempCnv,
+}
+
+#[derive(Debug)]
+pub struct ADCReadOutReadable {
+    pub pvdd: u16,
+    pub vbat: u16,
+    pub temp: i16,
+}
+
+impl From<ADCReadout> for ADCReadOutReadable {
+    fn from(value: ADCReadout) -> Self {
+        Self {
+            pvdd: value.pvdd.to_millivolts(),
+            vbat: value.vbat.to_millivolts(),
+            temp: value.temp.to_celcius(),
+        }
+    }
 }
 
 #[cfg(test)]
