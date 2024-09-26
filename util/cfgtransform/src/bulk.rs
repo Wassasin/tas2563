@@ -13,11 +13,7 @@ impl BulkGenerator {
     ) -> impl Iterator<Item = u8> + 'a {
         commands
             .map(|cmd| match cmd {
-                crate::ast::Command::Write(WriteCommand {
-                    address: _,
-                    register,
-                    bytes,
-                }) => {
+                crate::ast::Command::Write(WriteCommand { register, bytes }) => {
                     if bytes.len() == 1 {
                         Either::Left([*register, bytes[0]].into_iter())
                     } else {
@@ -55,7 +51,6 @@ mod test {
     #[test]
     fn single() {
         let command = Command::Write(WriteCommand {
-            address: 0x1b, // Not used
             register: 0x4b,
             bytes: vec![0x0f],
         });
@@ -69,7 +64,6 @@ mod test {
     #[test]
     fn burst_even() {
         let command = Command::Write(WriteCommand {
-            address: 0x1b, // Not used
             register: 0x4c,
             bytes: vec![0x01, 0x02],
         });
@@ -83,7 +77,6 @@ mod test {
     #[test]
     fn burst_odd() {
         let command = Command::Write(WriteCommand {
-            address: 0x1b, // Not used
             register: 0x4d,
             bytes: vec![0x01, 0x02, 0x03],
         });
@@ -98,17 +91,14 @@ mod test {
     fn mix() {
         let commands = vec![
             Command::Write(WriteCommand {
-                address: 0x1b, // Not used
                 register: 0x5a,
                 bytes: vec![0x0f],
             }),
             Command::Write(WriteCommand {
-                address: 0x1b, // Not used
                 register: 0x5c,
                 bytes: vec![0x0f, 0xa0],
             }),
             Command::Write(WriteCommand {
-                address: 0x1b, // Not used
                 register: 0x5e,
                 bytes: vec![0x01],
             }),

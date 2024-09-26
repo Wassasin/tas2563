@@ -19,7 +19,6 @@ impl<'a> IntoIterator for &'a Commands {
 
 #[derive(Debug)]
 pub struct WriteCommand {
-    pub address: u8,
     pub register: u8,
     pub bytes: Vec<u8>,
 }

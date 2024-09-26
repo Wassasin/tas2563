@@ -18,10 +18,10 @@ pub Commands: Commands = {
 }
 
 Command: Command = {
-    "w" <address:Num> <register:Num> <value:Num> <extra_values:ExtraValue*> => {
+    "w" <_address:Num> <register:Num> <value:Num> <extra_values:ExtraValue*> => {
         let mut values = vec![value];
         values.extend(extra_values);
-        Command::Write(WriteCommand { address, register, bytes: values })
+        Command::Write(WriteCommand { register, bytes: values })
     },
     "d" <duration:Num> => Command::Delay(duration),
 };
