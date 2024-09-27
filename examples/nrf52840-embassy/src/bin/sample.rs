@@ -34,10 +34,15 @@ async fn main(_spawner: Spawner) {
     let scl: peripherals::P1_01 = p.P1_01;
     let sda = p.P1_02;
 
-    let mck = p.P1_03;
-    let bck_sck = p.P1_04;
-    let wck_lrck = p.P1_05;
-    let din = p.P1_06;
+    let sbclk = p.P1_03;
+    let fsync = p.P1_04;
+    let sdin = p.P1_05;
+    let gpio = p.P1_06;
+
+    let mck = gpio;
+    let bck_sck = sbclk;
+    let wck_lrck = fsync;
+    let din = sdin;
 
     let mut config = twim::Config::default();
     config.frequency = Frequency::K400;
@@ -55,9 +60,9 @@ async fn main(_spawner: Spawner) {
     config.channels = Channels::MonoLeft;
 
     let buffers = DoubleBuffering::<Sample, NUM_SAMPLES>::new();
-    // let mut output_stream =
-    //     I2S::new_master(p.I2S, Irqs, mck, bck_sck, wck_lrck, master_clock, config)
-    //         .output(din, buffers);
+    let mut output_stream =
+        I2S::new_master(p.I2S, Irqs, mck, bck_sck, wck_lrck, master_clock, config)
+            .output(din, buffers);
 
     let mut hl = tas2563::hl::Tas2563::new_i2c(twim, tas2563::ll::i2c::Address::Global);
 
@@ -317,6 +322,17 @@ async fn main(_spawner: Spawner) {
     hl.ll().reset_assumptions();
 
     hl.ll()
+        .tdm_cfg_2()
+        .write_async(|w| {
+            w.rx_slen(RxSlen::Length32Bits)
+                .rx_wlen(RxWlen::Length24Bits)
+                .rx_scfg(RxScfg::MonoLeftChannel)
+                .ivmon_len(IvmonLen::Length16Bits)
+        })
+        .await
+        .unwrap();
+
+    hl.ll()
         .pb_cfg_1()
         .write_async(|w| w.dis_dc_blocker(false).amp_level(AmpLevel::Amp16DBv0))
         .await
@@ -330,38 +346,38 @@ async fn main(_spawner: Spawner) {
 
     defmt::info!("Speaker activated");
 
-    loop {
-        let adc = hl.adc().await.unwrap();
-        defmt::info!("{}", defmt::Debug2Format(&adc));
+    // loop {
+    //     let adc = hl.adc().await.unwrap();
+    //     defmt::info!("{}", defmt::Debug2Format(&adc));
 
-        let adc: ADCReadOutReadable = adc.into();
-        defmt::info!("{}", defmt::Debug2Format(&adc));
+    //     let adc: ADCReadOutReadable = adc.into();
+    //     defmt::info!("{}", defmt::Debug2Format(&adc));
 
-        Timer::after_secs(1).await;
-    }
+    //     Timer::after_secs(1).await;
+    // }
 
     // initialize(&mut ll).await.unwrap();
 
     // let mut waveform = Waveform::new(1.0 / sample_rate as f32);
     // waveform.process(output_stream.buffer());
 
-    // const SAMPLE: &'static [u8] = include_bytes!("../../../samples/windows95.raw");
+    const SAMPLE: &'static [u8] = include_bytes!("../../../samples/windows-xp.raw");
 
-    // output_stream.start().await.expect("I2S Start");
+    output_stream.start().await.expect("I2S Start");
 
-    // let mut i = 0;
-    // loop {
-    //     for j in output_stream.buffer() {
-    //         *j = i16::from_le_bytes([SAMPLE[i], SAMPLE[i + 1]]);
-    //         i = (i + 2) % SAMPLE.len();
-    //     }
+    let mut i = 0;
+    loop {
+        for j in output_stream.buffer() {
+            *j = i16::from_le_bytes([SAMPLE[i], SAMPLE[i + 1]]);
+            i = (i + 2) % SAMPLE.len();
+        }
 
-    //     // waveform.process(output_stream.buffer());
+        // waveform.process(output_stream.buffer());
 
-    //     if let Err(err) = output_stream.send().await {
-    //         defmt::error!("{}", err);
-    //     }
-    // }
+        if let Err(err) = output_stream.send().await {
+            defmt::error!("{}", err);
+        }
+    }
 }
 
 struct Waveform {

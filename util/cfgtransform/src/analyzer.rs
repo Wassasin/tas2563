@@ -81,17 +81,18 @@ where
                 let book = ra.book;
                 let page = ra.page;
 
-                if self.prev_page != Some(page) {
+                if self.prev_book != Some(book) {
+                    self.prev_book = Some(book);
+                    self.prev_page = None; // When the book is reset, forget our assumptions about the page.
+                    crate::ast::WriteCommand {
+                        register: BOOK_REGISTER,
+                        bytes: vec![book],
+                    }
+                } else if self.prev_page != Some(page) {
                     self.prev_page = Some(page);
                     crate::ast::WriteCommand {
                         register: PAGE_REGISTER,
                         bytes: vec![page],
-                    }
-                } else if self.prev_book != Some(book) {
-                    self.prev_book = Some(book);
-                    crate::ast::WriteCommand {
-                        register: BOOK_REGISTER,
-                        bytes: vec![book],
                     }
                 } else {
                     let first_register = ra.register;
