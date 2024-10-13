@@ -9,12 +9,7 @@ use crate::ll::{
 };
 use crate::prelude::*;
 
-/// High level interface for the Bq2515x family of chips.
-///
-/// Assumes that the device is not in Low Power mode during interactions. This can be managed by either:
-/// * Permanently tying the *not-low-power* (/LP) pin to low.
-/// * Manually pulling the *not-low-power* (/LP) pin to low and awaiting the prequisite time when planning to use the device.
-/// * Use the [Bq2515xLowPower] interface to manage the *not-low-power* (/LP) pin for you.
+/// High level interface for the TAS2563 chipset.
 pub struct Tas2563<T> {
     dev: Tas2563Device<T>,
 }

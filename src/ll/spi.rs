@@ -19,7 +19,7 @@ impl<T: SpiDevice> Tas2563Interface for SPIInterface<T> {
     }
 
     async fn read_registers(&mut self, register: u8, data: &mut [u8]) -> Result<(), T::Error> {
-        for (register, b) in (register..(register+data.len() as u8)).zip(data.iter_mut()) {
+        for (register, b) in (register..(register + data.len() as u8)).zip(data.iter_mut()) {
             *b = self.read_register(register).await?;
         }
         Ok(())

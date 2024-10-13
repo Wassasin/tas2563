@@ -31,7 +31,7 @@ async fn main(_spawner: Spawner) {
     let p = embassy_nrf::init(Default::default());
     info!("running!");
 
-    let scl: peripherals::P1_01 = p.P1_01;
+    let scl = p.P1_01;
     let sda = p.P1_02;
 
     let sbclk = p.P1_03;
