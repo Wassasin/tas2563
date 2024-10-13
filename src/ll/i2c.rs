@@ -1,4 +1,3 @@
-use embedded_hal::i2c::Operation;
 use embedded_hal_async::i2c::I2c;
 
 use super::{Tas2563Device, Tas2563Interface};

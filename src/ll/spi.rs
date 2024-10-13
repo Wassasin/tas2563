@@ -18,16 +18,17 @@ impl<T: SpiDevice> Tas2563Interface for SPIInterface<T> {
         Ok(())
     }
 
-    async fn read_registers(&mut self, mut register: u8, data: &mut [u8]) -> Result<(), T::Error> {
-        let mut buf = [0u8; 2];
-        for b in data {
-            buf[0] = register << 1 | 0b1;
-            buf[1] = 0x00;
-            self.spi.transfer_in_place(&mut buf).await?;
-            *b = buf[1];
-            register += 1;
+    async fn read_registers(&mut self, register: u8, data: &mut [u8]) -> Result<(), T::Error> {
+        for (register, b) in (register..(register+data.len() as u8)).zip(data.iter_mut()) {
+            *b = self.read_register(register).await?;
         }
         Ok(())
+    }
+
+    async fn read_register(&mut self, register: u8) -> Result<u8, Self::Error> {
+        let mut buf = [register << 1 | 0b1, 0x00];
+        self.spi.transfer_in_place(&mut buf).await?;
+        Ok(buf[1])
     }
 
     async fn write_register(&mut self, register: u8, value: u8) -> Result<(), Self::Error> {

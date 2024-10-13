@@ -54,6 +54,13 @@ pub trait Tas2563Interface {
     /// separate single register reads.
     async fn read_registers(&mut self, register: u8, values: &mut [u8]) -> Result<(), Self::Error>;
 
+    /// Convenience function to read a single register value.
+    async fn read_register(&mut self, register: u8) -> Result<u8, Self::Error> {
+        let mut buf = [0u8];
+        self.read_registers(register, &mut buf).await?;
+        Ok(buf[0])
+    }
+
     /// Convenience function to create a single register write.
     async fn write_register(&mut self, register: u8, value: u8) -> Result<(), Self::Error> {
         self.write_burst(&[register, value]).await
